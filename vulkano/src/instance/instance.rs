@@ -222,11 +222,11 @@ impl Instance {
                     .engine_version
                     .map(|v| v.into_vulkan_version())
                     .unwrap_or(0),
-                apiVersion: Version {
+                apiVersion: app_infos.api_version.unwrap_or(Version {
                     major: 1,
                     minor: 1,
                     patch: 0,
-                }.into_vulkan_version(), // TODO:
+                }).into_vulkan_version(), // TODO:
             })
 
         } else {
@@ -543,6 +543,8 @@ pub struct ApplicationInfo<'a> {
     pub engine_name: Option<Cow<'a, str>>,
     /// An opaque number that contains the version number of the engine.
     pub engine_version: Option<Version>,
+    /// The minimum Vulkan API version.
+    pub api_version: Option<Version>,
 }
 
 impl<'a> ApplicationInfo<'a> {
@@ -568,6 +570,7 @@ impl<'a> ApplicationInfo<'a> {
             application_version: Some(version),
             engine_name: None,
             engine_version: None,
+            api_version: None,
         }
     }
 }
@@ -595,6 +598,7 @@ macro_rules! app_info_from_cargo_toml {
             application_version: Some(version),
             engine_name: None,
             engine_version: None,
+            api_version: None,
         }
     }}
 }
@@ -606,6 +610,7 @@ impl<'a> Default for ApplicationInfo<'a> {
             application_version: None,
             engine_name: None,
             engine_version: None,
+            api_version: None,
         }
     }
 }
