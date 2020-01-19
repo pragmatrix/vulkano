@@ -12,8 +12,8 @@ use vulkano::instance::Instance;
 use vulkano::instance::InstanceExtensions;
 use vulkano::swapchain::Surface;
 use vulkano::swapchain::SurfaceCreationError;
-use winit::{EventsLoop, WindowBuilder};
-use winit::CreationError as WindowCreationError;
+use winit::window::WindowBuilder;
+use winit::event_loop::EventLoop;
 
 #[cfg(target_os = "macos")]
 use cocoa::appkit::{NSView, NSWindow};
@@ -26,6 +26,7 @@ use objc::runtime::YES;
 
 #[cfg(target_os = "macos")]
 use std::mem;
+use winit::error::OsError;
 
 pub fn required_extensions() -> InstanceExtensions {
     let ideal = InstanceExtensions {
@@ -52,22 +53,22 @@ pub fn create_vk_surface<W>(
     window: W, instance: Arc<Instance>
 ) -> Result<Arc<Surface<W>>, SurfaceCreationError>
 where
-    W: SafeBorrow<winit::Window>,
+    W: SafeBorrow<winit::window::Window>,
 {
     unsafe { winit_to_surface(instance, window) }
 }
 
 pub trait VkSurfaceBuild {
-    fn build_vk_surface(
-        self, events_loop: &EventsLoop, instance: Arc<Instance>,
-    ) -> Result<Arc<Surface<winit::Window>>, CreationError>;
+    fn build_vk_surface<T: 'static>(
+        self, event_loop: &EventLoop<T>, instance: Arc<Instance>,
+    ) -> Result<Arc<Surface<winit::window::Window>>, CreationError>;
 }
 
 impl VkSurfaceBuild for WindowBuilder {
-    fn build_vk_surface(
-        self, events_loop: &EventsLoop, instance: Arc<Instance>,
-    ) -> Result<Arc<Surface<winit::Window>>, CreationError> {
-        let window = self.build(events_loop)?;
+    fn build_vk_surface<T: 'static>(
+        self, event_loop: &EventLoop<T>, instance: Arc<Instance>,
+    ) -> Result<Arc<Surface<winit::window::Window>>, CreationError> {
+        let window = self.build(event_loop)?;
         Ok(create_vk_surface(window, instance)?)
     }
 }
@@ -78,7 +79,7 @@ pub enum CreationError {
     /// Error when creating the surface.
     SurfaceCreationError(SurfaceCreationError),
     /// Error when creating the window.
-    WindowCreationError(WindowCreationError),
+    WindowCreationError(OsError),
 }
 
 impl error::Error for CreationError {
@@ -102,7 +103,8 @@ impl error::Error for CreationError {
 impl fmt::Display for CreationError {
     #[inline]
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "{}", error::Error::description(self))
+        use std::error::Error;
+        write!(fmt, "{}", Error::description(self))
     }
 }
 
@@ -113,9 +115,9 @@ impl From<SurfaceCreationError> for CreationError {
     }
 }
 
-impl From<WindowCreationError> for CreationError {
+impl From<OsError> for CreationError {
     #[inline]
-    fn from(err: WindowCreationError) -> CreationError {
+    fn from(err: OsError) -> CreationError {
         CreationError::WindowCreationError(err)
     }
 }
@@ -161,14 +163,14 @@ unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn winit_to_surface<W: SafeBorrow<winit::Window>>(
+unsafe fn winit_to_surface<W: SafeBorrow<winit::window::Window>>(
     instance: Arc<Instance>, win: W,
 ) -> Result<Arc<Surface<W>>, SurfaceCreationError> {
-    use winit::os::windows::WindowExt;
+    use winit::platform::windows::WindowExtWindows;
     Surface::from_hwnd(
         instance,
         ptr::null() as *const (), // FIXME
-        win.borrow().get_hwnd(),
+        win.borrow().hwnd(),
         win,
     )
 }
